@@ -1,0 +1,14 @@
+{
+    "name": "create-scaffolding-donnie",
+    "version": "1.0.3",
+    "description": "test package to create a basic scaffolding",
+    "main": "./index.js",
+    "bin": {
+        "create-scaffolding-donnie": "./index.js"
+    },
+    "scripts": {
+        "test": "echo \"Error: no test specified\" && exit 1"
+    },
+    "author": "",
+    "license": "ISC"
+}
