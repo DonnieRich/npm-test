@@ -1,65 +1,80 @@
 #!/usr/bin/env node
 
 import fs from 'fs/promises';
-import { Command, Option } from 'commander';
+import { fileURLToPath } from "node:url";
+import path from "node:path";
+import inquirer from 'inquirer';
+import chalk from 'chalk';
 
-const init = async (projectName) => {
-    console.log('📑  Copying files...');
+const copyTemplateFilesAndFolders = async (source, destination, projectName) => {
+    const filesAndFolders = await fs.readdir(source);
 
-    await fs.mkdir(`./${projectName}`);
+    for (const entry of filesAndFolders) {
 
-    await fs.mkdir(`./${projectName}/public/`, { recursive: true });
-    await fs.mkdir(`./${projectName}/src/assets/scss`, { recursive: true });
-    await fs.mkdir(`./${projectName}/src/components`, { recursive: true });
-    await fs.mkdir(`./${projectName}/src/router`, { recursive: true });
-    await fs.mkdir(`./${projectName}/src/state`, { recursive: true });
-    await fs.mkdir(`./${projectName}/src/views`, { recursive: true });
+        const currentSource = path.join(source, entry);
+        const currentDestination = path.join(destination, entry);
 
-    await fs.copyFile('./template/vue/public/favicon.ico', `./${projectName}/public/favicon.ico`);
-    await fs.copyFile('./template/vue/src/assets/scss/main.scss', `./${projectName}/src/assets/scss/main.scss`);
+        const stat = await fs.lstat(currentSource);
 
-    await fs.copyFile('./template/vue/src/components/SimpleComponent.vue', `./${projectName}/src/components/SimpleComponent.vue`);
-    await fs.copyFile('./template/vue/src/components/TheWelcome.vue', `./${projectName}/src/components/TheWelcome.vue`);
-    await fs.copyFile('./template/vue/src/components/CustomComponent.vue', `./${projectName}/src/components/CustomComponent.vue`);
+        if (stat.isDirectory()) {
 
-    await fs.copyFile('./template/vue/src/router/index.js', `./${projectName}/src/router/index.js`);
-    await fs.copyFile('./template/vue/src/state/store.js', `./${projectName}/src/state/store.js`);
+            await fs.mkdir(currentDestination);
+            await copyTemplateFilesAndFolders(currentSource, currentDestination);
 
-    await fs.copyFile('./template/vue/src/views/AboutView.vue', `./${projectName}/src/views/AboutView.vue`);
-    await fs.copyFile('./template/vue/src/views/HomeView.vue', `./${projectName}/src/views/HomeView.vue`);
+        } else {
 
-    await fs.copyFile('./template/vue/src/App.vue', `./${projectName}/src/App.vue`);
-    await fs.copyFile('./template/vue/src/main.js', `./${projectName}/src/main.js`);
+            // If the file is package.json we replace the default name with the one provided by the user
+            if (/package.json/.test(currentSource)) {
+                const currentPackageJson = await fs.readFile(currentSource, 'utf8');
+                const newFileContent = currentPackageJson.replace(/custom-scaffolding/g, projectName);
 
-    await fs.copyFile('./template/vue/.gitignore', `./${projectName}/.gitignore`);
-    await fs.copyFile('./template/vue/index.html', `./${projectName}/index.html`);
-    await fs.copyFile('./template/vue/jsconfig.json', `./${projectName}/jsconfig.json`);
-    await fs.copyFile('./template/vue/package.json', `./${projectName}/package.json`);
-    await fs.copyFile('./template/vue/vite.config.js', `./${projectName}/vite.config.js`);
-    await fs.copyFile('./template/vue/vitest.config.js', `./${projectName}/vitest.config.js`);
+                await fs.writeFile(currentDestination, newFileContent, 'utf8');
+            } else {
+                await fs.copyFile(currentSource, currentDestination);
+            }
 
-    const currentPackageJson = await fs.readFile(`./template/vue/package.json`, 'utf8');
-    const newFileContent = currentPackageJson.replace(/custom-scaffolding/g, projectName);
-
-    await fs.writeFile(`./${projectName}/package.json`, newFileContent, 'utf8');
-
-    console.log('📑  Files copied...');
-    console.log(`cd ${projectName}
-    npm install
-    npm run dev`);
-
+        }
+    }
 };
 
-const program = new Command();
+const init = async (projectName) => {
 
-program
-    .addOption(new Option('-p, --project <name>', 'Create custom project with name'));
+    const destination = path.join(process.cwd(), projectName);
 
-program.parse(process.argv);
+    const source = path.resolve(
+        path.dirname(fileURLToPath(import.meta.url)),
+        "./template/vue"
+    );
 
-const options = program.opts();
-if (options.project) {
-    init(options.name);
-} else {
-    init('obi-wan-kenobi');
-}
+    try {
+        console.log('📑  Copying files...');
+
+        await fs.mkdir(destination);
+        await copyTemplateFilesAndFolders(source, destination, projectName);
+
+        console.log('📑  Files copied...');
+        console.log(chalk.green(`\ncd ${projectName}\nnpm install\nnpm run dev`));
+    } catch (error) {
+        console.log(error);
+    }
+};
+
+(async () => inquirer
+    .prompt([
+        {
+            type: "input",
+            name: "projectName",
+            default: "obi-wan-kenobi"
+        }
+    ])
+    .then((answers) => {
+        init(answers.projectName);
+    })
+    .catch((error) => {
+        if (error.isTtyError) {
+            // Prompt couldn't be rendered in the current environment
+            console.log(chalk.red("Cannot render the prompt..."));
+        } else {
+            console.log(chalk.red(error.message));
+        }
+    }))();
