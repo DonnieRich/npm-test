@@ -1,6 +1,6 @@
 {
     "name": "create-scaffolding-donnie",
-    "version": "1.0.5",
+    "version": "1.1.0",
     "description": "test package to create a basic scaffolding",
     "main": "./index.js",
     "type": "module",
